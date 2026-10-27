@@ -2,11 +2,20 @@ from __future__ import annotations
 
 import base64
 import time
+import re
 from typing import Any, Dict, Optional, Tuple, List
-from functools import lru_cache
 
 import requests
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
+
+
+def _is_retryable_read_error(exc: BaseException) -> bool:
+	"""Retry transient read failures, but not ordinary client/configuration errors."""
+	if isinstance(exc, (requests.ConnectionError, requests.Timeout)):
+		return True
+	if isinstance(exc, NiFiError):
+		return exc.status_code == 429 or (exc.status_code is not None and exc.status_code >= 500)
+	return False
 
 
 class NiFiError(Exception):
@@ -41,7 +50,7 @@ class NiFiClient:
 		return f"{self.base_url}/{path.lstrip('/')}"
 
 	@retry(
-		retry=retry_if_exception_type((NiFiError, requests.HTTPError, requests.ConnectionError, requests.Timeout)),
+		retry=retry_if_exception(_is_retryable_read_error),
 		wait=wait_exponential(multiplier=0.5, min=0.5, max=5),
 		stop=stop_after_attempt(3),
 		reraise=True,
@@ -58,12 +67,6 @@ class NiFiClient:
 			)
 		return resp.json()
 
-	@retry(
-		retry=retry_if_exception_type((NiFiError, requests.HTTPError, requests.ConnectionError, requests.Timeout)),
-		wait=wait_exponential(multiplier=0.5, min=0.5, max=5),
-		stop=stop_after_attempt(3),
-		reraise=True,
-	)
 	def _put(self, path: str, data: Dict[str, Any]) -> Dict[str, Any]:
 		resp = self.session.put(self._url(path), json=data, timeout=self.timeout)
 		if not resp.ok:
@@ -76,12 +79,6 @@ class NiFiClient:
 			)
 		return resp.json()
 
-	@retry(
-		retry=retry_if_exception_type((NiFiError, requests.HTTPError, requests.ConnectionError, requests.Timeout)),
-		wait=wait_exponential(multiplier=0.5, min=0.5, max=5),
-		stop=stop_after_attempt(3),
-		reraise=True,
-	)
 	def _post(self, path: str, data: Dict[str, Any]) -> Dict[str, Any]:
 		resp = self.session.post(self._url(path), json=data, timeout=self.timeout)
 		if not resp.ok:
@@ -94,12 +91,6 @@ class NiFiClient:
 			)
 		return resp.json()
 
-	@retry(
-		retry=retry_if_exception_type((NiFiError, requests.HTTPError, requests.ConnectionError, requests.Timeout)),
-		wait=wait_exponential(multiplier=0.5, min=0.5, max=5),
-		stop=stop_after_attempt(3),
-		reraise=True,
-	)
 	def _delete(self, path: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
 		resp = self.session.delete(self._url(path), params=params, timeout=self.timeout)
 		if not resp.ok:
@@ -113,7 +104,7 @@ class NiFiClient:
 		return resp.json() if resp.content else {}
 
 	@retry(
-		retry=retry_if_exception_type((NiFiError, requests.HTTPError, requests.ConnectionError, requests.Timeout)),
+		retry=retry_if_exception(_is_retryable_read_error),
 		wait=wait_exponential(multiplier=0.5, min=0.5, max=5),
 		stop=stop_after_attempt(3),
 		reraise=True,
@@ -135,17 +126,18 @@ class NiFiClient:
 		return self._get("flow/about")
 
 	def get_version_tuple(self) -> Tuple[int, int, int]:
-		"""Get NiFi version as (major, minor, patch) tuple for version detection."""
+		"""Return the detected NiFi version; never guess after a failed lookup."""
 		if self._version_info is None:
-			try:
-				about = self.get_version_info()
-				version_str = about.get("about", {}).get("version", "1.0.0")
-				# Parse version string like "2.0.0" or "1.23.2"
-				parts = version_str.split(".")[:3]
-				self._version_info = tuple(int(p) for p in parts)
-			except Exception:
-				# Default to 1.x if detection fails
-				self._version_info = (1, 0, 0)
+			about = self.get_version_info()
+			version_str = about.get("about", {}).get("version")
+			match = re.match(r"^\s*(\d+)\.(\d+)(?:\.(\d+))?", str(version_str or ""))
+			if not match:
+				raise NiFiError(
+					"Unable to determine NiFi version from /flow/about; "
+					"version-sensitive operations are blocked until detection succeeds."
+				)
+			major, minor, patch = match.groups()
+			self._version_info = (int(major), int(minor), int(patch or 0))
 		return self._version_info
 
 	def is_nifi_2x(self) -> bool:
@@ -762,11 +754,13 @@ class NiFiClient:
 			"connections": {"total": 0, "with_queued_data": 0, "backpressure": 0},
 			"bulletins": [],
 			"errors": [],
-			"overallHealth": "HEALTHY"
+			"checks": {"processors": "PENDING", "connections": "PENDING", "controllerServices": "PENDING", "bulletins": "PENDING"},
+			"overallHealth": "UNKNOWN"
 		}
 		
 		# Get processors
 		processors = self.list_processors(pg_id)
+		health["checks"]["processors"] = "OK"
 		for proc in processors.get("processors", []):
 			health["processors"]["total"] += 1
 			run_status = proc.get("status", {}).get("runStatus", "STOPPED")
@@ -795,11 +789,14 @@ class NiFiClient:
 				elif "INVALID" in state or "ERROR" in state:
 					health["controllerServices"]["invalid"] += 1
 					health["errors"].append(f"Service '{svc.get('component', {}).get('name')}' is invalid")
-		except Exception:
-			pass  # Services might not be accessible at all levels
+			health["checks"]["controllerServices"] = "OK"
+		except Exception as exc:
+			health["checks"]["controllerServices"] = "FAILED"
+			health["errors"].append(f"Controller-service check failed: {type(exc).__name__}: {exc}")
 		
 		# Get connections
 		connections = self.list_connections(pg_id)
+		health["checks"]["connections"] = "OK"
 		for conn in connections.get("connections", []):
 			health["connections"]["total"] += 1
 			status = conn.get("status", {})
@@ -825,12 +822,16 @@ class NiFiClient:
 				})
 				if bulletin.get("bulletin", {}).get("level") in ["ERROR", "WARN"]:
 					health["errors"].append(bulletin.get("bulletin", {}).get("message"))
-		except Exception:
-			pass
-		
-		# Determine overall health
+			health["checks"]["bulletins"] = "OK"
+		except Exception as exc:
+			health["checks"]["bulletins"] = "FAILED"
+			health["errors"].append(f"Bulletin check failed: {type(exc).__name__}: {exc}")
+
+		# Missing coverage must never be presented as a clean bill of health.
 		if health["processors"]["invalid"] > 0 or health["controllerServices"]["invalid"] > 0:
 			health["overallHealth"] = "UNHEALTHY"
+		elif any(status == "FAILED" for status in health["checks"].values()):
+			health["overallHealth"] = "UNKNOWN"
 		elif health["connections"]["backpressure"] > 0 or len(health["errors"]) > 0:
 			health["overallHealth"] = "DEGRADED"
 		else:

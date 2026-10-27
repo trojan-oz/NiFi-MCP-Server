@@ -16,7 +16,11 @@ from .setup_helper import SetupGuide
 
 # Lazy import of MCP to give a clear error if the dependency is missing
 try:
-	from mcp.server import FastMCP
+	# FastMCP is exposed from its dedicated module in current MCP SDK releases.
+	try:
+		from mcp.server.fastmcp import FastMCP
+	except ImportError:  # compatibility with SDK releases that re-exported it
+		from mcp.server import FastMCP
 	from mcp.server.stdio import stdio_server
 except Exception as e:  # pragma: no cover
 	raise RuntimeError(
@@ -26,11 +30,26 @@ except Exception as e:  # pragma: no cover
 
 def _redact_sensitive(obj: Any, max_items: int = 200) -> Any:
 	"""Redact common sensitive fields and truncate large collections for LLMs."""
-	redact_keys = {"password", "passcode", "token", "secret", "kerberosKeytab", "sslKeystorePasswd"}
+	# Normalize key names so camelCase, snake_case, hyphenated and mixed-case
+	# variants receive the same treatment. Match suffixes, not arbitrary substrings
+	# (e.g. do not redact a harmless field named "tokenizerMode").
+	sensitive_names = {
+		"password", "passwd", "passphrase", "passcode", "token", "secret",
+		"apikey", "authorization", "cookie", "privatekey", "kerberoskeytab",
+		"sslkeystorepasswd", "keystorepassword", "truststorepassword",
+	}
 	if isinstance(obj, dict):
 		redacted: Dict[str, Any] = {}
 		for k, v in obj.items():
-			if k.lower() in redact_keys:
+			normalized_key = "".join(ch for ch in str(k).lower() if ch.isalnum())
+			is_sensitive = (
+				normalized_key in sensitive_names
+				or any(normalized_key.endswith(suffix) for suffix in (
+					"password", "passwd", "passphrase", "passcode", "token",
+					"secret", "apikey", "authorization", "cookie", "privatekey", "keytab"
+				))
+			)
+			if is_sensitive:
 				redacted[k] = "***REDACTED***"
 			else:
 				redacted[k] = _redact_sensitive(v, max_items)
