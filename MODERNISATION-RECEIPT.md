@@ -69,3 +69,45 @@ A follow-up audit found that ServerConfig parsed NIFI_ALLOWED_ACTIONS, but the s
 - Read-only tools remain available regardless of the write allowlist.
 
 Three regression tests cover allowlist filtering, unknown action rejection, and backward-compatible explicit write enablement. Current checkout suite: 8/8 tests pass. The allowlist is an MCP tool-exposure guardrail, not a substitute for NiFi's own authentication/authorisation policies.
+
+---
+
+## Independent audit reconciliation — current authoritative state, 2026-10-28
+
+This section supersedes any earlier checkpoint in this receipt that says the branch was unpublished or reports an earlier test count. Earlier counts are retained above as historical checkpoints, not the current result.
+
+### Source and reproducible code checks
+
+- Published source: `trojan-oz/NiFi-MCP-Server`, branch `modernise/evidence-first-guardrails`, audited head before this receipt update: `2dedf8726c58e8ce873846c35d0a03bfc0e278b1`.
+- Working Mac checkout matched that exact commit and branch.
+- Command: `PYTHONPATH=src /tmp/nifi-mcp-modernise/.venv/bin/python -m pytest -q` — **9 passed in 2.34s**, exit 0.
+- Command: `PYTHONPATH=src /tmp/nifi-mcp-modernise/.venv/bin/python -m compileall -q src tests scripts` — exit 0.
+- Command: `git diff --check` — exit 0.
+- Command: `/tmp/nifi-mcp-modernise/.venv/bin/python -m pip check` — “No broken requirements found”, exit 0.
+- Command: `PYTHONPATH=src /tmp/nifi-mcp-modernise/.venv/bin/python scripts/smoke_mcp.py` — exit 0; protocol `2025-11-25`, server `nifi-mcp-server 1.30.0`, 35 tools; required version/root-group/processors/health tools found.
+- The smoke output explicitly states: **“NiFi API connectivity: NOT TESTED by this smoke test.”** These checks establish code quality and protocol/tool discovery only.
+
+### Fresh private-service and target discovery
+
+- Cloudflare tunnel inventory reports `mcp-bridge` with no active connection.
+- The active `t4h-mac` tunnel configuration maps `mac.tech4humanity.com.au` to `http://127.0.0.1:8787`; it does not declare the MCP hostname. No local listener was present on ports 8787, 3000, 8000 or 8443 during the check.
+- Public unauthenticated probe of `https://mcp.tech4humanity.com.au/mcp` returned HTTP 401. The root path timed out and `/health` returned 404. A 401 is not proof that the origin is healthy or that an authenticated MCP request succeeds.
+- No authorised live NiFi API URL or authentication method was found in the scoped local configuration/repository search. The configured SSH alias `ec2` timed out on port 22.
+- AWS CLI identity is available. Initial ap-southeast-2 checks found no NiFi/MCP-named SSM parameters or Secrets Manager entries. A cross-region EC2 scan produced no positive running-instance rows, but per-region errors were suppressed; do not treat that as definitive proof of global absence.
+- GCP Compute Engine discovery for project `mcp-bridge-478002` returned a billing-disabled error. No billing change was made; enabling billing requires explicit cost authorisation.
+- No secret values were printed or committed. No tunnel routing was changed, no unauthenticated listener was exposed, and no NiFi operation was invoked.
+
+### Six-step acceptance register
+
+| Gate | State | Closure evidence required |
+|---|---|---|
+| Restore private Cloudflare path | **BLOCKED** | Correct origin host/port and tunnel mapping; active tunnel; Access and origin auth intact; authenticated MCP initialize/tool call succeeds |
+| Establish real NiFi target/auth | **BLOCKED** | Authorised NiFi API URL, approved auth method and permitted network path; secrets remain server-side |
+| Intended AI-client live reads | **BLOCKED** | Actual version, root process group, processors and flow-health responses from live NiFi |
+| Independent comparison/security negatives | **BLOCKED** | Timestamped comparison with NiFi UI/direct API plus auth-denial, unreachable-target, redaction, GET retry and partial-health results |
+| Safe non-production mutation | **NOT RUN — AUTHORISATION REQUIRED** | Explicit target/action approval; reversible operation; independent read-back and cleanup, or formally recorded exclusion |
+| Remote deployment and rollback | **BLOCKED** | Private authenticated endpoint, verified client calls, TLS/network/access evidence and tested rollback |
+
+### Audit disposition
+
+**PARTIAL — NOT ACCEPTED — NOT PRODUCTION-READY.** The code hardening and local MCP protocol checks are verified at the scope stated above. End-to-end acceptance depends on an authorised NiFi target/authentication configuration and the correct private Cloudflare origin/tunnel mapping. A demo, HTTP 401, local handshake, or unit test cannot substitute for those missing acceptance results.
