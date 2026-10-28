@@ -328,3 +328,27 @@ To enable write operations, set `NIFI_READONLY=false` in your configuration. The
 ## License
 
 Apache License 2.0
+
+
+## Modernisation decision record
+
+The rationale for preserving the original local `stdio` deployment model during the first modernisation pass, the assumptions we are testing, and the alternatives to evaluate after the baseline is approved are documented in [`MODERNISATION-DECISION-RECORD.md`](MODERNISATION-DECISION-RECORD.md). This records hypotheses as hypotheses; it does not claim to know the original author's private reasoning or imply that live NiFi integration has already been verified.
+
+
+## Local MCP protocol smoke tests
+
+These tests verify MCP initialization and tool registration only. They do **not** verify that a configured NiFi API is reachable or authenticated.
+
+With the test environment installed:
+
+```bash
+PYTHONPATH=src python scripts/smoke_mcp.py
+```
+
+To test Streamable HTTP, start the server in a second terminal with `MCP_TRANSPORT=streamable-http`, then run:
+
+```bash
+PYTHONPATH=src python scripts/smoke_mcp.py --transport streamable-http --url http://127.0.0.1:8000/mcp
+```
+
+Keep the HTTP listener on loopback for this smoke test. Do not expose it to a network without implementing and verifying authentication, authorisation, TLS and a secure network path to NiFi. Use an authorised real NiFi endpoint and keep `NIFI_READONLY=true` for end-to-end read acceptance.

@@ -36,3 +36,16 @@ pip install -e '.[test]'
 python -m unittest discover -s tests -v
 python -m compileall -q src tests
 ```
+
+
+## Repeatable MCP protocol smoke checks — 2026-10-28
+
+Verified again on the connected Mac using `/tmp/nifi-mcp-modernise/.venv/bin/python`:
+
+- `python -m unittest discover -s tests -v`: **5/5 passed**.
+- `python -m compileall -q src tests scripts`: passed.
+- `git diff --check`: passed.
+- `PYTHONPATH=src python scripts/smoke_mcp.py`: passed; MCP protocol `2025-11-25`, server `nifi-mcp-server 1.30.0`, 35 tools registered; all four required tools found.
+- Started Streamable HTTP locally on `127.0.0.1:8000`, then ran `scripts/smoke_mcp.py --transport streamable-http --url http://127.0.0.1:8000/mcp`: passed with the same 35 tools; MCP HTTP requests returned 200/202 as expected. The temporary server was terminated after the test.
+
+**Scope limitation remains:** both protocol tests use `NIFI_API_BASE=http://127.0.0.1:1/nifi-api`, an intentionally unreachable placeholder, and `NIFI_READONLY=true`. They do not call NiFi tools or prove live API connectivity/authentication. Safe config discovery found no NiFi entry in Claude Desktop's MCP server list, no NiFi-related environment variables, and no local listeners on ports 8000, 8080, 8443 or 9090 after the test. The only discovered `.env` file contains unrelated MCP-governance settings; its values were not displayed. A real authorised NiFi endpoint and approved authentication method remain required for end-to-end acceptance.
