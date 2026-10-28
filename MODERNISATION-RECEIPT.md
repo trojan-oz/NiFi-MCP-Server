@@ -51,6 +51,13 @@ Verified again on the connected Mac using `/tmp/nifi-mcp-modernise/.venv/bin/pyt
 **Scope limitation remains:** both protocol tests use `NIFI_API_BASE=http://127.0.0.1:1/nifi-api`, an intentionally unreachable placeholder, and `NIFI_READONLY=true`. They do not call NiFi tools or prove live API connectivity/authentication. Safe config discovery found no NiFi entry in Claude Desktop's MCP server list, no NiFi-related environment variables, and no local listeners on ports 8000, 8080, 8443 or 9090 after the test. The only discovered `.env` file contains unrelated MCP-governance settings; its values were not displayed. A real authorised NiFi endpoint and approved authentication method remain required for end-to-end acceptance.
 
 
+
+Additional MCP transport check after allowlist implementation:
+
+- A real stdio MCP client session launched the server with NIFI_READONLY=false and NIFI_ALLOWED_ACTIONS=start_processor.
+- MCP tools/list returned 36 tools: start_processor was exposed, create_processor and empty_connection_queue were absent, and read-only get_controller_service_details remained available.
+- No NiFi tool was invoked; this proves MCP-level tool exposure only, not NiFi API connectivity or a write operation.
+
 ## Action allowlist enforcement — 2026-10-28
 
 A follow-up audit found that ServerConfig parsed NIFI_ALLOWED_ACTIONS, but the server did not apply the setting when registering mutation tools. This meant the configuration looked available without actually limiting the tool surface. That gap is now fixed in this branch:
