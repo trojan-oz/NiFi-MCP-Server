@@ -90,8 +90,20 @@ def build_client(config: ServerConfig) -> NiFiClient:
 	)
 
 
-def create_server(nifi: NiFiClient, readonly: bool) -> FastMCP:
+def create_server(nifi: NiFiClient, readonly: bool, allowed_actions_csv: str = "") -> FastMCP:
 	app = FastMCP("nifi-mcp-server")
+	allowed_actions = {item.strip().casefold() for item in allowed_actions_csv.split(",") if item.strip()}
+	known_write_actions: set[str] = set()
+
+	def write_tool():
+		"""Register a mutation tool only when the optional action allowlist permits it."""
+		def decorator(func):
+			action_name = func.__name__.casefold()
+			known_write_actions.add(action_name)
+			if not allowed_actions or action_name in allowed_actions:
+				return app.tool()(func)
+			return func
+		return decorator
 
 	@app.tool()
 	async def get_nifi_version() -> Dict[str, Any]:
@@ -287,19 +299,19 @@ def create_server(nifi: NiFiClient, readonly: bool) -> FastMCP:
 	# ===== Write Tools (only enabled when NIFI_READONLY=false) =====
 
 	if not readonly:
-		@app.tool()
+		@write_tool()
 		async def start_processor(processor_id: str, version: int) -> Dict[str, Any]:
 			"""Start a processor. **WRITE OPERATION** - Requires NIFI_READONLY=false."""
 			data = nifi.start_processor(processor_id, version)
 			return _redact_sensitive(data)
 
-		@app.tool()
+		@write_tool()
 		async def stop_processor(processor_id: str, version: int) -> Dict[str, Any]:
 			"""Stop a processor. **WRITE OPERATION** - Requires NIFI_READONLY=false."""
 			data = nifi.stop_processor(processor_id, version)
 			return _redact_sensitive(data)
 
-		@app.tool()
+		@write_tool()
 		async def create_processor(
 			process_group_id: str,
 			processor_type: str,
@@ -319,7 +331,7 @@ def create_server(nifi: NiFiClient, readonly: bool) -> FastMCP:
 			data = nifi.create_processor(process_group_id, processor_type, name, position_x, position_y)
 			return _redact_sensitive(data)
 
-		@app.tool()
+		@write_tool()
 		async def update_processor_config(
 			processor_id: str,
 			version: int,
@@ -335,13 +347,13 @@ def create_server(nifi: NiFiClient, readonly: bool) -> FastMCP:
 			data = nifi.update_processor(processor_id, version, config)
 			return _redact_sensitive(data)
 
-		@app.tool()
+		@write_tool()
 		async def delete_processor(processor_id: str, version: int) -> Dict[str, Any]:
 			"""Delete a processor. **WRITE OPERATION** - Requires NIFI_READONLY=false."""
 			data = nifi.delete_processor(processor_id, version)
 			return _redact_sensitive(data)
 
-		@app.tool()
+		@write_tool()
 		async def create_connection(
 			process_group_id: str,
 			source_id: str,
@@ -367,7 +379,7 @@ def create_server(nifi: NiFiClient, readonly: bool) -> FastMCP:
 			)
 			return _redact_sensitive(data)
 
-		@app.tool()
+		@write_tool()
 		async def delete_connection(connection_id: str, version: int) -> Dict[str, Any]:
 			"""Delete a connection. **WRITE OPERATION** - Requires NIFI_READONLY=false.
 			
@@ -377,7 +389,7 @@ def create_server(nifi: NiFiClient, readonly: bool) -> FastMCP:
 			data = nifi.delete_connection(connection_id, version)
 			return _redact_sensitive(data)
 
-		@app.tool()
+		@write_tool()
 		async def empty_connection_queue(connection_id: str) -> Dict[str, Any]:
 			"""Drop all flowfiles from a connection's queue. **WRITE OPERATION** - Requires NIFI_READONLY=false.
 			
@@ -386,19 +398,19 @@ def create_server(nifi: NiFiClient, readonly: bool) -> FastMCP:
 			data = nifi.empty_connection_queue(connection_id)
 			return _redact_sensitive(data)
 
-		@app.tool()
+		@write_tool()
 		async def enable_controller_service(service_id: str, version: int) -> Dict[str, Any]:
 			"""Enable a controller service. **WRITE OPERATION** - Requires NIFI_READONLY=false."""
 			data = nifi.enable_controller_service(service_id, version)
 			return _redact_sensitive(data)
 
-		@app.tool()
+		@write_tool()
 		async def disable_controller_service(service_id: str, version: int) -> Dict[str, Any]:
 			"""Disable a controller service. **WRITE OPERATION** - Requires NIFI_READONLY=false."""
 			data = nifi.disable_controller_service(service_id, version)
 			return _redact_sensitive(data)
 		
-		@app.tool()
+		@write_tool()
 		async def create_controller_service(process_group_id: str, service_type: str, name: str) -> Dict[str, Any]:
 			"""Create a controller service in a process group. **WRITE OPERATION** - Requires NIFI_READONLY=false.
 			
@@ -416,7 +428,7 @@ def create_server(nifi: NiFiClient, readonly: bool) -> FastMCP:
 			data = nifi.create_controller_service(process_group_id, service_type, name)
 			return _redact_sensitive(data)
 		
-		@app.tool()
+		@write_tool()
 		async def update_controller_service_properties(service_id: str, version: int, properties: Dict[str, str]) -> Dict[str, Any]:
 			"""Update controller service properties. **WRITE OPERATION** - Requires NIFI_READONLY=false.
 			
@@ -473,7 +485,7 @@ def create_server(nifi: NiFiClient, readonly: bool) -> FastMCP:
 		}
 	
 	if not readonly:
-		@app.tool()
+		@write_tool()
 		async def delete_controller_service(service_id: str, version: int) -> Dict[str, Any]:
 			"""Delete a controller service. **WRITE OPERATION** - Requires NIFI_READONLY=false.
 			
@@ -484,7 +496,7 @@ def create_server(nifi: NiFiClient, readonly: bool) -> FastMCP:
 			data = nifi.delete_controller_service(service_id, version)
 			return _redact_sensitive(data)
 		
-		@app.tool()
+		@write_tool()
 		async def start_new_flow(flow_name: str, parent_pg_id: str = None) -> Dict[str, Any]:
 			"""Start a new NiFi flow following best practices. **WRITE OPERATION** - Requires NIFI_READONLY=false.
 			
@@ -507,7 +519,7 @@ def create_server(nifi: NiFiClient, readonly: bool) -> FastMCP:
 			result = smart_builder.start_new_flow(flow_name, parent_pg_id)
 			return _redact_sensitive(result)
 		
-		@app.tool()
+		@write_tool()
 		async def create_process_group(parent_id: str, name: str, position_x: float = 0.0, position_y: float = 0.0) -> Dict[str, Any]:
 			"""Create a process group (folder) for organizing flows. **WRITE OPERATION** - Requires NIFI_READONLY=false.
 			
@@ -523,13 +535,13 @@ def create_server(nifi: NiFiClient, readonly: bool) -> FastMCP:
 			data = nifi.create_process_group(parent_id, name, position_x, position_y)
 			return _redact_sensitive(data)
 		
-		@app.tool()
+		@write_tool()
 		async def update_process_group_name(pg_id: str, version: int, name: str) -> Dict[str, Any]:
 			"""Rename a process group. **WRITE OPERATION** - Requires NIFI_READONLY=false."""
 			data = nifi.update_process_group(pg_id, version, name)
 			return _redact_sensitive(data)
 		
-		@app.tool()
+		@write_tool()
 		async def delete_process_group(pg_id: str, version: int) -> Dict[str, Any]:
 			"""Delete a process group. **WRITE OPERATION** - Requires NIFI_READONLY=false.
 			
@@ -542,7 +554,7 @@ def create_server(nifi: NiFiClient, readonly: bool) -> FastMCP:
 			data = nifi.delete_process_group(pg_id, version)
 			return _redact_sensitive(data)
 		
-		@app.tool()
+		@write_tool()
 		async def create_input_port(pg_id: str, name: str, position_x: float = 0.0, position_y: float = 0.0) -> Dict[str, Any]:
 			"""Create an input port for inter-process-group communication. **WRITE OPERATION** - Requires NIFI_READONLY=false.
 			
@@ -552,7 +564,7 @@ def create_server(nifi: NiFiClient, readonly: bool) -> FastMCP:
 			data = nifi.create_input_port(pg_id, name, position_x, position_y)
 			return _redact_sensitive(data)
 		
-		@app.tool()
+		@write_tool()
 		async def create_output_port(pg_id: str, name: str, position_x: float = 0.0, position_y: float = 0.0) -> Dict[str, Any]:
 			"""Create an output port for inter-process-group communication. **WRITE OPERATION** - Requires NIFI_READONLY=false.
 			
@@ -562,37 +574,37 @@ def create_server(nifi: NiFiClient, readonly: bool) -> FastMCP:
 			data = nifi.create_output_port(pg_id, name, position_x, position_y)
 			return _redact_sensitive(data)
 		
-		@app.tool()
+		@write_tool()
 		async def update_input_port(port_id: str, version: int, name: str) -> Dict[str, Any]:
 			"""Update (rename) an input port. **WRITE OPERATION** - Requires NIFI_READONLY=false."""
 			data = nifi.update_input_port(port_id, version, name)
 			return _redact_sensitive(data)
 		
-		@app.tool()
+		@write_tool()
 		async def update_output_port(port_id: str, version: int, name: str) -> Dict[str, Any]:
 			"""Update (rename) an output port. **WRITE OPERATION** - Requires NIFI_READONLY=false."""
 			data = nifi.update_output_port(port_id, version, name)
 			return _redact_sensitive(data)
 		
-		@app.tool()
+		@write_tool()
 		async def delete_input_port(port_id: str, version: int) -> Dict[str, Any]:
 			"""Delete an input port. **WRITE OPERATION** - Requires NIFI_READONLY=false."""
 			data = nifi.delete_input_port(port_id, version)
 			return _redact_sensitive(data)
 		
-		@app.tool()
+		@write_tool()
 		async def delete_output_port(port_id: str, version: int) -> Dict[str, Any]:
 			"""Delete an output port. **WRITE OPERATION** - Requires NIFI_READONLY=false."""
 			data = nifi.delete_output_port(port_id, version)
 			return _redact_sensitive(data)
 		
-		@app.tool()
+		@write_tool()
 		async def get_parameter_context_details(context_id: str) -> Dict[str, Any]:
 			"""Get parameter context with all parameters."""
 			data = nifi.get_parameter_context(context_id)
 			return _redact_sensitive(data)
 		
-		@app.tool()
+		@write_tool()
 		async def create_parameter_context(name: str, description: str = "", parameters: str = "[]") -> Dict[str, Any]:
 			"""Create a parameter context for environment-specific configuration. **WRITE OPERATION** - Requires NIFI_READONLY=false.
 			
@@ -609,7 +621,7 @@ def create_server(nifi: NiFiClient, readonly: bool) -> FastMCP:
 			data = nifi.create_parameter_context(name, description, params_list)
 			return _redact_sensitive(data)
 		
-		@app.tool()
+		@write_tool()
 		async def update_parameter_context(context_id: str, version: int, name: str = None, parameters: str = None) -> Dict[str, Any]:
 			"""Update parameter context. **WRITE OPERATION** - Requires NIFI_READONLY=false.
 			
@@ -620,7 +632,7 @@ def create_server(nifi: NiFiClient, readonly: bool) -> FastMCP:
 			data = nifi.update_parameter_context(context_id, version, name, None, params_list)
 			return _redact_sensitive(data)
 		
-		@app.tool()
+		@write_tool()
 		async def delete_parameter_context(context_id: str, version: int) -> Dict[str, Any]:
 			"""Delete a parameter context. **WRITE OPERATION** - Requires NIFI_READONLY=false.
 			
@@ -629,7 +641,7 @@ def create_server(nifi: NiFiClient, readonly: bool) -> FastMCP:
 			data = nifi.delete_parameter_context(context_id, version)
 			return _redact_sensitive(data)
 		
-		@app.tool()
+		@write_tool()
 		async def start_input_port(port_id: str, version: int) -> Dict[str, Any]:
 			"""Start an input port to enable data flow. **WRITE OPERATION** - Requires NIFI_READONLY=false.
 			
@@ -638,13 +650,13 @@ def create_server(nifi: NiFiClient, readonly: bool) -> FastMCP:
 			data = nifi.start_input_port(port_id, version)
 			return _redact_sensitive(data)
 		
-		@app.tool()
+		@write_tool()
 		async def stop_input_port(port_id: str, version: int) -> Dict[str, Any]:
 			"""Stop an input port to disable data flow. **WRITE OPERATION** - Requires NIFI_READONLY=false."""
 			data = nifi.stop_input_port(port_id, version)
 			return _redact_sensitive(data)
 		
-		@app.tool()
+		@write_tool()
 		async def start_output_port(port_id: str, version: int) -> Dict[str, Any]:
 			"""Start an output port to enable data flow. **WRITE OPERATION** - Requires NIFI_READONLY=false.
 			
@@ -653,13 +665,13 @@ def create_server(nifi: NiFiClient, readonly: bool) -> FastMCP:
 			data = nifi.start_output_port(port_id, version)
 			return _redact_sensitive(data)
 		
-		@app.tool()
+		@write_tool()
 		async def stop_output_port(port_id: str, version: int) -> Dict[str, Any]:
 			"""Stop an output port to disable data flow. **WRITE OPERATION** - Requires NIFI_READONLY=false."""
 			data = nifi.stop_output_port(port_id, version)
 			return _redact_sensitive(data)
 		
-		@app.tool()
+		@write_tool()
 		async def apply_parameter_context_to_process_group(pg_id: str, pg_version: int, context_id: str) -> Dict[str, Any]:
 			"""Apply a parameter context to a process group. **WRITE OPERATION** - Requires NIFI_READONLY=false.
 			
@@ -673,7 +685,7 @@ def create_server(nifi: NiFiClient, readonly: bool) -> FastMCP:
 			data = nifi.apply_parameter_context_to_process_group(pg_id, pg_version, context_id)
 			return _redact_sensitive(data)
 		
-		@app.tool()
+		@write_tool()
 		async def start_all_processors_in_group(pg_id: str) -> Dict[str, Any]:
 			"""Start ALL processors in a process group at once. **WRITE OPERATION** - Requires NIFI_READONLY=false.
 			
@@ -689,7 +701,7 @@ def create_server(nifi: NiFiClient, readonly: bool) -> FastMCP:
 			data = nifi.start_all_processors_in_group(pg_id)
 			return _redact_sensitive(data)
 		
-		@app.tool()
+		@write_tool()
 		async def stop_all_processors_in_group(pg_id: str) -> Dict[str, Any]:
 			"""Stop ALL processors in a process group at once. **WRITE OPERATION** - Requires NIFI_READONLY=false.
 			
@@ -705,7 +717,7 @@ def create_server(nifi: NiFiClient, readonly: bool) -> FastMCP:
 			data = nifi.stop_all_processors_in_group(pg_id)
 			return _redact_sensitive(data)
 		
-		@app.tool()
+		@write_tool()
 		async def enable_all_controller_services_in_group(pg_id: str) -> Dict[str, Any]:
 			"""Enable ALL controller services in a process group at once. **WRITE OPERATION** - Requires NIFI_READONLY=false.
 			
@@ -721,7 +733,7 @@ def create_server(nifi: NiFiClient, readonly: bool) -> FastMCP:
 			data = nifi.enable_all_controller_services_in_group(pg_id)
 			return _redact_sensitive(data)
 		
-		@app.tool()
+		@write_tool()
 		async def terminate_processor(processor_id: str, version: int) -> Dict[str, Any]:
 			"""Forcefully terminate a stuck processor. **WRITE OPERATION** - Requires NIFI_READONLY=false.
 			
@@ -739,7 +751,7 @@ def create_server(nifi: NiFiClient, readonly: bool) -> FastMCP:
 			data = nifi.terminate_processor(processor_id, version)
 			return _redact_sensitive(data)
 
-		@app.tool()
+		@write_tool()
 		async def replay_flowfile_from_provenance(event_id: str) -> Dict[str, Any]:
 			"""Re-queue a new flowfile from a provenance event's content. **WRITE OPERATION** - Requires NIFI_READONLY=false.
 
@@ -751,7 +763,7 @@ def create_server(nifi: NiFiClient, readonly: bool) -> FastMCP:
 			data = nifi.replay_flowfile_from_provenance(event_id)
 			return _redact_sensitive(data)
 
-		@app.tool()
+		@write_tool()
 		async def reset_counter(counter_id: str) -> Dict[str, Any]:
 			"""Reset a single NiFi counter's value to 0. **WRITE OPERATION** - Requires NIFI_READONLY=false."""
 			data = nifi.reset_counter(counter_id)
@@ -923,6 +935,12 @@ def create_server(nifi: NiFiClient, readonly: bool) -> FastMCP:
 		data = nifi.list_counters()
 		return _redact_sensitive(data)
 
+	if not readonly and allowed_actions:
+		unknown_actions = sorted(allowed_actions - known_write_actions)
+		if unknown_actions:
+			unknown = ", ".join(unknown_actions)
+			raise ValueError(f"NIFI_ALLOWED_ACTIONS contains unknown write tool name(s): {unknown}")
+
 	return app
 
 
@@ -930,7 +948,7 @@ async def run_stdio() -> None:
 	# For FastMCP, prefer the built-in stdio runner
 	config = ServerConfig()
 	nifi = build_client(config)
-	server = create_server(nifi, readonly=config.readonly)
+	server = create_server(nifi, readonly=config.readonly, allowed_actions_csv=config.allowed_actions_csv)
 	# run() is synchronous; call the async flavor directly
 	await server.run_stdio_async()
 
