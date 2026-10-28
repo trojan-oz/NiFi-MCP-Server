@@ -22,7 +22,7 @@ These explanations may overlap. We should ask the author or customer rather than
 - Keep the NiFi API as the system of record; MCP tools must query and act on NiFi, not on a simulated display.
 - Preserve the existing read-only-by-default posture and require explicit configuration for mutations.
 - Improve the existing implementation within that boundary: dependency compatibility, authentication options, version handling, error reporting, secret redaction, safe retry behaviour, diagnostics, enforced NIFI_ALLOWED_ACTIONS tool filtering and tests.
-- Do not make Cloudflare hosting, a browser-control agent, or a new remote transport a prerequisite for the first modernised build.
+- For the first code-validation pass, preserve local stdio and do not prematurely replace it with remote hosting. This does not waive the final deployment requirement: when a shared/remote endpoint is required, it must be private behind Cloudflare Access/Tunnel, not Vercel or an unauthenticated public service. The tunnel/origin and real NiFi API path must be independently verified before calling that deployment complete.
 - Do not represent the TV page or simulated operations data as proof of MCP-to-NiFi integration.
 
 This is a conservative first pass, not a claim that `stdio` is always best. It keeps the first version close enough to the original that we can validate and discuss it without conflating the results with a new architecture.
@@ -45,7 +45,7 @@ Evaluate these against actual requirements and evidence, rather than switching t
 | Browser automation alongside MCP | A workflow truly requires operating a visible web UI in addition to the NiFi API | Browser actions are separately authorised and tested; UI control is not confused with MCP-to-NiFi control |
 | Customer-specific deployment | Customer security, networking, cost or platform requirements dictate a different arrangement | The constraints are documented and the chosen configuration passes acceptance tests |
 
-Cloudflare is an option, not proof of integration and not automatically the right place to run the NiFi process. A Worker alone cannot reach a private NiFi API unless a secure network path is established.
+Cloudflare is the required private access/front-door path for the intended remote deployment, but it is not proof of integration and is not automatically the right place to run the Python NiFi MCP process. A Worker alone cannot reach a private NiFi API unless a secure network path is established.
 
 ## Acceptance gate for the first modernised build
 
