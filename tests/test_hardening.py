@@ -4,7 +4,7 @@ import unittest
 import requests
 
 from nifi_mcp_server.client import NiFiClient, NiFiError
-from nifi_mcp_server.server import _redact_sensitive
+from nifi_mcp_server.server import _redact_sensitive, create_server
 
 
 class FakeResponse:
@@ -116,6 +116,26 @@ class HardeningTests(unittest.TestCase):
         self.assertEqual(health["checks"]["bulletins"], "FAILED")
         self.assertTrue(any("Controller-service check failed" in e for e in health["errors"]))
         self.assertTrue(any("Bulletin check failed" in e for e in health["errors"]))
+
+
+    def test_allowed_actions_restricts_registered_write_tools(self):
+        server = create_server(NiFiClient("https://nifi.invalid/nifi-api", FakeSession()), readonly=False, allowed_actions_csv=" start_processor, STOP_PROCESSOR ")
+        names = {tool.name for tool in server._tool_manager.list_tools()}
+        self.assertIn("get_nifi_version", names)
+        self.assertIn("start_processor", names)
+        self.assertIn("stop_processor", names)
+        self.assertNotIn("create_processor", names)
+        self.assertNotIn("empty_connection_queue", names)
+
+    def test_allowed_actions_rejects_unknown_write_tool_names(self):
+        with self.assertRaisesRegex(ValueError, "unknown write tool name"):
+            create_server(NiFiClient("https://nifi.invalid/nifi-api", FakeSession()), readonly=False, allowed_actions_csv="start_procesor")
+
+    def test_empty_allowed_actions_preserves_explicit_write_enablement(self):
+        server = create_server(NiFiClient("https://nifi.invalid/nifi-api", FakeSession()), readonly=False, allowed_actions_csv="")
+        names = {tool.name for tool in server._tool_manager.list_tools()}
+        self.assertIn("start_processor", names)
+        self.assertIn("create_processor", names)
 
 
 if __name__ == "__main__":
