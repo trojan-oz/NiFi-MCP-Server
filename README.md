@@ -337,7 +337,7 @@ The rationale for preserving the original local `stdio` deployment model during 
 
 ## Local MCP protocol smoke tests
 
-These tests verify MCP initialization and tool registration only. They do **not** verify that a configured NiFi API is reachable or authenticated.
+These tests verify MCP initialization and tool registration only. The stdio smoke test forcibly uses an unreachable placeholder NiFi URL, forces read-only mode, and strips inherited NiFi/Knox credentials so it cannot accidentally use a live target. It does **not** verify that a configured NiFi API is reachable or authenticated.
 
 With the test environment installed:
 

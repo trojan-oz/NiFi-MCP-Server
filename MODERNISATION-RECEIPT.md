@@ -15,7 +15,7 @@ This working branch combines the two existing fork improvements for standalone N
 
 ## Verification performed locally
 
-- `PYTHONPATH=src python -m unittest discover -s tests -v`: 8 tests passed in the current checkout.
+- `PYTHONPATH=src python -m unittest discover -s tests -v`: 9 tests passed in the current checkout.
 - `PYTHONPATH=src python -m compileall -q src tests scripts`: passed.
 - `git diff --check`: passed after whitespace cleanup.
 - No Docker used and no live NiFi/Knox cluster contacted.

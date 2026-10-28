@@ -42,8 +42,16 @@ async def main() -> int:
     args = parser.parse_args()
     if args.transport == "stdio":
         env = dict(os.environ)
-        env.setdefault("NIFI_API_BASE", "http://127.0.0.1:1/nifi-api")
-        env.setdefault("NIFI_READONLY", "true")
+        # This is a protocol-only smoke test: never inherit a live NiFi target or credentials.
+        env["NIFI_API_BASE"] = "http://127.0.0.1:1/nifi-api"
+        env["NIFI_READONLY"] = "true"
+        for key in (
+            "KNOX_GATEWAY_URL", "KNOX_TOKEN", "KNOX_COOKIE", "KNOX_USER",
+            "KNOX_PASSWORD", "KNOX_TOKEN_ENDPOINT", "KNOX_PASSCODE_TOKEN",
+            "NIFI_USERNAME", "NIFI_PASSWORD", "NIFI_CLIENT_CERT", "NIFI_CLIENT_KEY",
+            "KNOX_CA_BUNDLE", "NIFI_PROXY_CONTEXT_PATH",
+        ):
+            env.pop(key, None)
         env["MCP_TRANSPORT"] = "stdio"
         params = StdioServerParameters(
             command=sys.executable, args=["-m", "nifi_mcp_server.server"], env=env

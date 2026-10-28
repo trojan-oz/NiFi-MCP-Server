@@ -29,7 +29,7 @@ This is a conservative first pass, not a claim that `stdio` is always best. It k
 
 ## Improvements made so far
 
-The working local branch includes standalone NiFi authentication support and flowfile/provenance diagnostic tools from the existing fork branches, plus reliability and safety hardening. Eight local regression tests pass, including enforcement of the configured write-tool allowlist. These are code-level checks only: the server has **not** yet been demonstrated end to end against a live NiFi instance, and no live write operation has been verified.
+The working local branch includes standalone NiFi authentication support and flowfile/provenance diagnostic tools from the existing fork branches, plus reliability and safety hardening. Nine local regression tests pass, including enforcement of the configured write-tool allowlist and read-only-mode coverage. These are code-level checks only: the server has **not** yet been demonstrated end to end against a live NiFi instance, and no live write operation has been verified.
 
 The current local branch is `modernise/evidence-first-guardrails`, commit `b2cc77a`. The GitHub-folder copy is local/iCloud-synced; the push to the remote repository was denied by GitHub permissions, so this is not yet a published upstream change.
 

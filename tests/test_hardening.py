@@ -131,6 +131,14 @@ class HardeningTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unknown write tool name"):
             create_server(NiFiClient("https://nifi.invalid/nifi-api", FakeSession()), readonly=False, allowed_actions_csv="start_procesor")
 
+
+    def test_readonly_mode_never_registers_write_tools_even_with_allowlist(self):
+        server = create_server(NiFiClient("https://nifi.invalid/nifi-api", FakeSession()), readonly=True, allowed_actions_csv="start_processor")
+        names = {tool.name for tool in server._tool_manager.list_tools()}
+        self.assertNotIn("start_processor", names)
+        self.assertIn("get_controller_service_details", names)
+
+
     def test_empty_allowed_actions_preserves_explicit_write_enablement(self):
         server = create_server(NiFiClient("https://nifi.invalid/nifi-api", FakeSession()), readonly=False, allowed_actions_csv="")
         names = {tool.name for tool in server._tool_manager.list_tools()}
