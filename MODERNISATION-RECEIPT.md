@@ -15,8 +15,8 @@ This working branch combines the two existing fork improvements for standalone N
 
 ## Verification performed locally
 
-- `python -m unittest discover -s tests -v`: 5 tests passed.
-- `python -m compileall -q src tests`: passed.
+- `PYTHONPATH=src python -m unittest discover -s tests -v`: 8 tests passed in the current checkout.
+- `PYTHONPATH=src python -m compileall -q src tests scripts`: passed.
 - `git diff --check`: passed after whitespace cleanup.
 - No Docker used and no live NiFi/Knox cluster contacted.
 
@@ -49,3 +49,16 @@ Verified again on the connected Mac using `/tmp/nifi-mcp-modernise/.venv/bin/pyt
 - Started Streamable HTTP locally on `127.0.0.1:8000`, then ran `scripts/smoke_mcp.py --transport streamable-http --url http://127.0.0.1:8000/mcp`: passed with the same 35 tools; MCP HTTP requests returned 200/202 as expected. The temporary server was terminated after the test.
 
 **Scope limitation remains:** both protocol tests use `NIFI_API_BASE=http://127.0.0.1:1/nifi-api`, an intentionally unreachable placeholder, and `NIFI_READONLY=true`. They do not call NiFi tools or prove live API connectivity/authentication. Safe config discovery found no NiFi entry in Claude Desktop's MCP server list, no NiFi-related environment variables, and no local listeners on ports 8000, 8080, 8443 or 9090 after the test. The only discovered `.env` file contains unrelated MCP-governance settings; its values were not displayed. A real authorised NiFi endpoint and approved authentication method remain required for end-to-end acceptance.
+
+
+## Action allowlist enforcement — 2026-10-28
+
+A follow-up audit found that ServerConfig parsed NIFI_ALLOWED_ACTIONS, but the server did not apply the setting when registering mutation tools. This meant the configuration looked available without actually limiting the tool surface. That gap is now fixed in this branch:
+
+- With NIFI_READONLY=true, no mutation tools are registered.
+- When NIFI_READONLY=false and NIFI_ALLOWED_ACTIONS is non-empty, only exact comma-separated mutation-tool names are registered (case-insensitive; surrounding whitespace ignored).
+- Unknown names fail startup rather than silently enabling an unintended tool set.
+- An empty allowlist preserves backward compatibility: explicitly setting NIFI_READONLY=false exposes the full mutation tool set.
+- Read-only tools remain available regardless of the write allowlist.
+
+Three regression tests cover allowlist filtering, unknown action rejection, and backward-compatible explicit write enablement. Current checkout suite: 8/8 tests pass. The allowlist is an MCP tool-exposure guardrail, not a substitute for NiFi's own authentication/authorisation policies.
