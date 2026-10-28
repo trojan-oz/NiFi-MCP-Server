@@ -21,7 +21,7 @@ These explanations may overlap. We should ask the author or customer rather than
 - Keep the existing local `stdio` entry point and AI-host configuration.
 - Keep the NiFi API as the system of record; MCP tools must query and act on NiFi, not on a simulated display.
 - Preserve the existing read-only-by-default posture and require explicit configuration for mutations.
-- Improve the existing implementation within that boundary: dependency compatibility, authentication options, version handling, error reporting, secret redaction, safe retry behaviour, diagnostics and tests.
+- Improve the existing implementation within that boundary: dependency compatibility, authentication options, version handling, error reporting, secret redaction, safe retry behaviour, diagnostics, enforced NIFI_ALLOWED_ACTIONS tool filtering and tests.
 - Do not make Cloudflare hosting, a browser-control agent, or a new remote transport a prerequisite for the first modernised build.
 - Do not represent the TV page or simulated operations data as proof of MCP-to-NiFi integration.
 
@@ -29,7 +29,7 @@ This is a conservative first pass, not a claim that `stdio` is always best. It k
 
 ## Improvements made so far
 
-The working local branch includes standalone NiFi authentication support and flowfile/provenance diagnostic tools from the existing fork branches, plus reliability and safety hardening. Five local regression tests pass. These are code-level checks only: the server has **not** yet been demonstrated end to end against a live NiFi instance, and no live write operation has been verified.
+The working local branch includes standalone NiFi authentication support and flowfile/provenance diagnostic tools from the existing fork branches, plus reliability and safety hardening. Eight local regression tests pass, including enforcement of the configured write-tool allowlist. These are code-level checks only: the server has **not** yet been demonstrated end to end against a live NiFi instance, and no live write operation has been verified.
 
 The current local branch is `modernise/evidence-first-guardrails`, commit `b2cc77a`. The GitHub-folder copy is local/iCloud-synced; the push to the remote repository was denied by GitHub permissions, so this is not yet a published upstream change.
 
