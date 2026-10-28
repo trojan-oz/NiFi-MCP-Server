@@ -111,3 +111,13 @@ This section supersedes any earlier checkpoint in this receipt that says the bra
 ### Audit disposition
 
 **PARTIAL — NOT ACCEPTED — NOT PRODUCTION-READY.** The code hardening and local MCP protocol checks are verified at the scope stated above. End-to-end acceptance depends on an authorised NiFi target/authentication configuration and the correct private Cloudflare origin/tunnel mapping. A demo, HTTP 401, local handshake, or unit test cannot substitute for those missing acceptance results.
+
+### Continued discovery — 2026-10-28 21:38 +11:00
+
+- Local credential metadata exists for the `mcp-bridge` Cloudflare tunnel, but Cloudflare reports no active connector. No local service listens on ports 8787, 3000, 3030, 8000 or 8443. The local `t4h-mac` tunnel config routes only `mac.tech4humanity.com.au` to port 8787; it is not safe to repurpose it for MCP without an approved routing design.
+- Other Cloudflare tunnels are active, but their presence alone does not prove they route this hostname or can reach NiFi.
+- The local governed-MCP environment file has Supabase configuration only; no NiFi/Knox host or auth settings were found there.
+- GCP project `mcp-bridge-478002` returned no Compute Engine instance rows; its Secret Manager API is disabled, and Cloud Run API was not enabled in the checked MCP Bridge project. No APIs or billing were enabled, and no resources were created. Another active project, `gen-lang-client-0427780391`, did not yield a confirmed NiFi runtime. These checks do not prove no NiFi exists elsewhere.
+- A broad all-region AWS EC2 scan was stopped after high latency and is explicitly incomplete. Targeted AWS region checks returned no instance rows; the configured SSH alias timed out. No secrets were read or logged.
+
+**Execution boundary remains:** do not start a dead MCP listener or route the hostname to an unconfigured origin merely to make the tunnel show as connected. The next safe action requires locating the authorised NiFi API host and approved auth/network path, then configuring the correct private origin/tunnel route. No live NiFi call or mutation has been claimed.
