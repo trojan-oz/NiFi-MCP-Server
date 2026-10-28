@@ -49,7 +49,7 @@ Model Context Protocol server providing selectable read and write access to Apac
   - `get_cluster_summary()` - Whether this NiFi is clustered, and node counts
   - `list_cluster_nodes()` - Cluster node status (returns `{"clustered": false}` for standalone NiFi)
   - `list_counters()` - List NiFi counters (throughput tallies some processors maintain)
-- **44 write operations** (when `NIFI_READONLY=false`):
+- **38 write tools** (when `NIFI_READONLY=false`; optionally restricted by `NIFI_ALLOWED_ACTIONS`):
   - `start_processor(processor_id, version)` - Start a processor
   - `stop_processor(processor_id, version)` - Stop a processor
   - `create_processor(...)` - Create a new processor
@@ -352,3 +352,6 @@ PYTHONPATH=src python scripts/smoke_mcp.py --transport streamable-http --url htt
 ```
 
 Keep the HTTP listener on loopback for this smoke test. Do not expose it to a network without implementing and verifying authentication, authorisation, TLS and a secure network path to NiFi. Use an authorised real NiFi endpoint and keep `NIFI_READONLY=true` for end-to-end read acceptance.
+
+
+The allowlist is a tool-exposure guardrail, not a substitute for NiFi's own authentication and authorisation policies.
