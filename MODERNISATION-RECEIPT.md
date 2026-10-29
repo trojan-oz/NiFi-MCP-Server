@@ -121,3 +121,34 @@ This section supersedes any earlier checkpoint in this receipt that says the bra
 - A broad all-region AWS EC2 scan was stopped after high latency and is explicitly incomplete. Targeted AWS region checks returned no instance rows; the configured SSH alias timed out. No secrets were read or logged.
 
 **Execution boundary remains:** do not start a dead MCP listener or route the hostname to an unconfigured origin merely to make the tunnel show as connected. The next safe action requires locating the authorised NiFi API host and approved auth/network path, then configuring the correct private origin/tunnel route. No live NiFi call or mutation has been claimed.
+
+
+## Local NiFi API simulator and MCP safety harness — 2026-10-30
+
+### Implemented
+
+- Added tests/nifi_api_simulator.py, a deterministic HTTP test double for a small NiFi REST API subset. It binds to loopback by default, can optionally require a simulator-only bearer token, can queue selected HTTP failures, and can delay POST responses to model an ambiguous timeout. It does not run a NiFi engine or execute flows.
+- Added tests/test_nifi_api_simulator.py with HTTP contract tests and a real MCP stdio client/server round-trip pointed at the simulator.
+- Documented simulator usage, safety boundaries, and the difference between simulation and live acceptance in README.md.
+
+### Verification on the connected Mac
+
+- PYTHONPATH=src /tmp/nifi-mcp-modernise/.venv/bin/python -m pytest -q: **16 passed in 4.27s** (includes the existing hardening tests plus simulator and MCP end-to-end tests).
+- PYTHONPATH=src .../python -m compileall -q src tests scripts: passed.
+- git diff --check: passed.
+- .../python -m pip check: **No broken requirements found**.
+- PYTHONPATH=src .../python scripts/smoke_mcp.py: passed; MCP protocol 2025-11-25, server nifi-mcp-server 1.30.0, 35 tools, all required read tools discovered. This smoke test itself uses an intentionally unreachable target and does not test NiFi API connectivity.
+- Started the simulator manually on 127.0.0.1:18787, retrieved the fixture /flow/about response with curl, and terminated the temporary process after the check.
+
+### Safety cases exercised
+
+- HTTP reads for version, root process group, processors, connections, controller services and bulletins.
+- MCP stdio tool discovery and successful calls to get_nifi_version, get_root_process_group, list_processors, and get_flow_health_status against the simulator.
+- Read-only MCP tool registration: write tool start_processor is absent, and the exercised read-only call sequence produced no POST/PUT/DELETE requests.
+- Missing bearer token denied with HTTP 401.
+- Simulated HTTP 503 on a read recovers on retry; HTTP 400 is not retried.
+- Simulated POST response timeout after the simulator has recorded the request results in exactly one POST attempt (no automatic mutation retry).
+
+### Scope and disposition
+
+**Simulator/harness verified; live integration remains BLOCKED / NOT ACCEPTED / NOT PRODUCTION-READY.** These are controlled test fixtures, not a real Apache NiFi cluster. The harness cannot prove NiFi-version-specific schema compatibility, Cloudera authentication/network reachability, actual flow execution, real NiFi authorisation, or end-to-end production safety. No cloud resource was provisioned, no public listener/tunnel was opened, no real credentials were used, and no live NiFi mutation was attempted. The Cloudera 60-day trial remains the real-server acceptance target.

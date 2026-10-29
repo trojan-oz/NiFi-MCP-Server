@@ -6,6 +6,26 @@ Model Context Protocol server providing selectable read and write access to Apac
 
 ![](/screenshots/Nifi-meet-mcp.png)
 
+## Local NiFi API simulator and safety harness
+
+The deterministic simulator in `tests/nifi_api_simulator.py` implements a deliberately small subset of the NiFi REST API for local HTTP contract tests. It is a test double only: it does not run flows, emulate the NiFi engine, or prove compatibility with a real Apache NiFi/Cloudera deployment.
+
+Run the automated suite without Docker or external services:
+
+```bash
+PYTHONPATH=src python -m pytest -q
+PYTHONPATH=src python -m compileall -q src tests scripts
+```
+
+To inspect the simulator manually, bind to loopback only:
+
+```bash
+python tests/nifi_api_simulator.py --host 127.0.0.1 --port 18787
+curl -sS http://127.0.0.1:18787/nifi-api/flow/about
+```
+
+Optional `--token` enables a simulator-only bearer token. Never use real credentials for the simulator. Do not bind it to `0.0.0.0`, expose it through a tunnel, or use its responses as production evidence. The tests exercise version/root-group/processor/connection/controller-service/bulletin reads, authentication denial, retry handling and a simulated ambiguous POST timeout. Mutation safety is tested against the simulator only; no live NiFi mutation is attempted.
+
 ## Features
 
 - **Automatic version detection** - Detects NiFi 1.x vs 2.x and adapts behavior
