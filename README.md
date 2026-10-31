@@ -375,3 +375,16 @@ Keep the HTTP listener on loopback for this smoke test. Do not expose it to a ne
 
 
 The allowlist is a tool-exposure guardrail, not a substitute for NiFi's own authentication and authorisation policies.
+
+
+---
+
+## Project status — demonstration only (2026-10-31)
+
+**This repository is retained as a bounded demonstration/reference implementation. Apache NiFi is not a dependency of the operational system.** No live NiFi/Cloudera integration, remote deployment or production service is required or claimed.
+
+Start with the [Demonstration Guide](DEMO-GUIDE.md) for the purpose, architecture, local run instructions, test evidence, safety boundaries and cleanup steps. The deterministic simulator is a test double only; all fixture data is simulated.
+
+The final local verification receipt is in [MODERNISATION-RECEIPT.md](MODERNISATION-RECEIPT.md). The [decision record](MODERNISATION-DECISION-RECORD.md) contains the superseding demonstration-only decision. Earlier live-integration and hosting plans in historical sections are superseded and are not active instructions.
+
+Retain this code and its test artefacts. Do not provision Cloudera, deploy a public/remote NiFi endpoint, or make NiFi a production dependency for this project.
