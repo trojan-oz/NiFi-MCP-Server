@@ -152,3 +152,56 @@ This section supersedes any earlier checkpoint in this receipt that says the bra
 ### Scope and disposition
 
 **Simulator/harness verified; live integration remains BLOCKED / NOT ACCEPTED / NOT PRODUCTION-READY.** These are controlled test fixtures, not a real Apache NiFi cluster. The harness cannot prove NiFi-version-specific schema compatibility, Cloudera authentication/network reachability, actual flow execution, real NiFi authorisation, or end-to-end production safety. No cloud resource was provisioned, no public listener/tunnel was opened, no real credentials were used, and no live NiFi mutation was attempted. The Cloudera 60-day trial remains the real-server acceptance target.
+
+
+---
+
+## Final demonstration handover — 2026-10-31
+
+**Project disposition: CLOSED AT DEMONSTRATION SCOPE. NiFi is not an operational-system dependency.**
+
+The owner clarified that Apache NiFi is needed only for a demonstration. This supersedes earlier plans to establish a live NiFi target, Cloudera trial, private hosted MCP endpoint, production integration or BAU support. No further NiFi infrastructure work is required.
+
+### Demonstration artefacts retained
+
+- Hardened MCP server source and configuration.
+- Deterministic local REST API test double: `tests/nifi_api_simulator.py`.
+- HTTP contract and MCP stdio integration harness: `tests/test_nifi_api_simulator.py`.
+- Safe protocol smoke script: `scripts/smoke_mcp.py`.
+- This receipt and `MODERNISATION-DECISION-RECORD.md`.
+- Full operator-facing demo guide: `DEMO-GUIDE.md`.
+
+### Verified result at published head
+
+- Repository: `trojan-oz/NiFi-MCP-Server`
+- Branch: `modernise/evidence-first-guardrails`
+- Verified commit: `9cc75d3b5b9320a1e917ca56687e508493960a65`
+- On the authorised Mac, 2026-10-30: `PYTHONPATH=src .../python -m pytest -q` — **16 passed in 4.27s**.
+- `compileall -q src tests scripts`: passed.
+- `git diff --check`: passed.
+- `pip check`: no broken requirements found.
+- Safe MCP protocol smoke: passed; protocol `2025-11-25`, server `nifi-mcp-server 1.30.0`, 35 tools discovered. This smoke intentionally uses an unreachable placeholder NiFi URL and does not test live NiFi connectivity.
+- Manual loopback GET to `/nifi-api/flow/about` returned the simulator fixture. Temporary simulator process was stopped; a subsequent listener check found no listener.
+
+### What the tests demonstrate
+
+- HTTP contract handling for version, root process group, processors, connections, controller services and bulletins.
+- MCP stdio round-trip invoking version, root group, processor list and flow-health tools against the simulator.
+- Read-only tool registration and zero POST/PUT/DELETE requests during the read-only exercise.
+- Simulator bearer-token denial when credentials are absent/wrong.
+- Transient GET 503 retry/recovery and non-retry of GET 400.
+- No automatic second POST when a delayed simulated mutation response times out after the server has recorded the request.
+
+### What is not claimed
+
+No live NiFi/Cloudera compatibility, live authentication, real NiFi data retrieval, independent comparison with a live NiFi UI/API, live mutation, remote deployment, production readiness, support/SLA or BAU operation is claimed. Simulator fixtures are synthetic and must always be labelled as simulated.
+
+### Safety and cleanup boundary
+
+No cloud resources were provisioned; no APIs or billing were enabled; no public listener or tunnel was opened; no real credentials were used; no live NiFi mutation was attempted. The demo fork and source artefacts are intentionally retained. The last local process/listener check found no simulator listener. A later cleanup recheck was unavailable because Desktop Commander monthly usage was exhausted; temporary test cache/environment deletion is not claimed. Do not delete the source checkout or preserved receipt/patch backups as part of temporary cleanup.
+
+### Reactivation rule
+
+Reopen only for a named demonstration requirement. Use a disposable local environment, loopback-only simulator, no production credentials, and explicit simulated-data labels. Any future live NiFi test is a separate scope requiring an authorised target and approval; it is not implied by this demonstration.
+
+**Final statement: the MCP/NiFi demonstration artefacts are retained and documented; simulator/protocol scope is verified; live NiFi integration is not required and is not claimed.**
