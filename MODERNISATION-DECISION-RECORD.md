@@ -59,3 +59,23 @@ Before choosing a different architecture, demonstrate all of the following:
 6. The setup and result are repeatable from the documented instructions.
 
 **Decision rule:** establish the original path first; approve the initial build; then choose any transport or hosting changes from demonstrated requirements. Keep unknowns labelled as unknowns.
+
+
+---
+
+## Superseding decision — 2026-10-31: demonstration only
+
+**Decision: CLOSED. Apache NiFi is not required by the operational system; it is retained solely as an optional demonstration target.**
+
+This owner decision supersedes the earlier initial-modernisation decision, remote deployment assumptions, live NiFi acceptance gate and alternative-hosting evaluation. Those earlier sections are preserved as historical context, not active work instructions.
+
+- Do not provision a Cloudera trial or NiFi environment for this project.
+- Do not restore or create a Cloudflare tunnel, public endpoint, remote MCP deployment or production service for NiFi.
+- Do not treat NiFi, Knox or this MCP server as dependencies of T4H operational systems.
+- Retain the code, simulator, tests, receipt and demo guide in the owned fork as reusable demonstration/reference artefacts.
+- Use the simulator for repeatable demonstrations. Clearly label its fixtures as simulated; it is not a NiFi engine and does not establish real-server compatibility.
+- Reactivate live integration only under a separately approved, named demo requirement with an authorised NiFi target.
+
+**Verified boundary:** local tests and MCP protocol/simulator exercises passed at commit `9cc75d3b5b9320a1e917ca56687e508493960a65`; no live NiFi integration or production deployment was tested or required.
+
+The author's personal reason for the original design remains unknown; this decision records the current project owner's scope, not an inference about the original author.
